@@ -26,6 +26,13 @@ namespace TestTeaShop
 			get { return id; }
 		}
 
+		/// <summary>
+		/// Konstruktör för en Customer
+		/// </summary>
+		/// <param name="id">Customer ID</param>
+		/// <param name="numTeaCups">mängd av önskade tekoppar</param>
+		/// <param name="hasHurriedOrder">om kunden vill ta snabba beställningar i slutet</param>
+		/// <param name="owner">Owner (ägare) objektet</param>
 		public Customer(int id, int numTeaCups, bool hasHurriedOrder, Owner owner)
 		{
 			this.id = id;
@@ -36,13 +43,17 @@ namespace TestTeaShop
 
 			Console.WriteLine("\nCustomer " + id + " enters and greets the Owner.\n");
 
-			//owner.lastCall += ReceiveLastCall;
-			//owner.stopServing += ReceiveStopServing;
-			//goodbye += owner.ReceiveGoodbye;
-
 			RunCustomer();
 		}
 
+		/// <summary>
+		/// RunCustomer kör kundens beteende. Om kunden vill ha fler koppar
+		/// och affären är inte stängd eller nära stängningsdags, tar kunden
+		/// lite tid på sig, beställer och sedan väntar på beställningen.
+		/// Om affären är stängd eller kunden har fått alla koppar, lämnar
+		/// kunden affären.
+		/// </summary>
+		/// <returns>Task (tom)</returns>
 		private async Task RunCustomer()
 		{
 			while(numTeaCups > 0 && !isLastOrders && !isClosed)
@@ -53,27 +64,49 @@ namespace TestTeaShop
 				Task.WaitAll(order);
 			}
 
+			while (numTeaCups > 0 && isLastOrders && !isClosed && hasHurriedOrder)
+			{
+				Task hurriedOrder = CustomerLastOrders();
+				await hurriedOrder;
+				Task.WaitAll(hurriedOrder);
+			}
+
 			if (numTeaCups <= 0 || isClosed)
 				await SendGoodbye();
 		}
 
+		/// <summary>
+		/// En pause på 2 sekunder.
+		/// </summary>
 		public void Pause()
 		{
 			Task.Delay(2000);
 		}
 
+		/// <summary>
+		/// OrderTea utför en tebeställning för kunden. 
+		/// </summary>
+		/// <returns>Task (tom)</returns>
 		private async Task OrderTea()
 		{
 			isOrdering = true;
 			Console.WriteLine("\nCustomer " + id + " orders tea.\n");
+
 			Task receieveOrder = owner.TakeOrder(id);
+			//Gör beställning
 			await receieveOrder;
+
+			//När beställningen är klar, kunden drycker te
 			if (receieveOrder.IsCompleted)
 			{
 				numTeaCups--;
 				Console.WriteLine("\nCustomer " + id + " receives tea.\n");
+
+				//Kunden drycker te
 				Task drinkTea = DrinkTea();
 				await drinkTea;
+				
+				//När klar, rapporteras hur många fler kunden vill ha
 				if(drinkTea.IsCompleted)
 				{
 					cupsDrank++;
@@ -83,6 +116,12 @@ namespace TestTeaShop
 			}
 		}
 
+		/// <summary>
+		/// DrinkTea drycker te snabbare eller långsammare beroende på om kunden är
+		/// av den typen som vill drycker snabbt och beställer mer nära stängningsdags
+		/// eller inte.
+		/// </summary>
+		/// <returns></returns>
 		private async Task DrinkTea()
 		{
 			if (!isLastOrders)
@@ -92,7 +131,7 @@ namespace TestTeaShop
 			}
 			else if (isLastOrders && hasHurriedOrder)
 			{
-				Console.WriteLine("\nCustomer " + id + " is hurriedly gulping tea!\n");
+				Console.WriteLine("\n**Customer " + id + " is hurriedly gulping tea!**\n");
 				await Task.Delay(hurriedDrinkDelay);
 			}
 			else
@@ -102,25 +141,42 @@ namespace TestTeaShop
 			}
 		}
 
+		/// <summary>
+		/// CustomerLastOrders körs när det är nära slutet av beställningstiden. Kunder
+		/// som har hasHurriedOrder som falsk eller har fått alla koppar (eller om det är
+		/// stängningdags) bara lämnar affären. Annars kunder med hasHurriedOrder som
+		/// sann försöker ta en extra beställning så länge de fortfarande vill ha en
+		/// kopp och det är inte slutet av beställningstiden.
+		/// </summary>
+		/// <returns></returns>
 		private async Task CustomerLastOrders()
 		{
 			while (hasHurriedOrder && numTeaCups > 0 && isLastOrders && !isClosed)
 			{
-				Task order = OrderTea();
-				await order;
-				Task.WaitAll(order);
+				Task hurriedOrder = OrderTea();
+				await hurriedOrder;
+				Task.WaitAll(hurriedOrder);
 			}
 
 			if (numTeaCups <= 0 || !hasHurriedOrder || isClosed)
 				await SendGoodbye();
 		}
 
+		/// <summary>
+		/// ReceiveLastCall tar emot anropning om sista tiden innan slutet
+		/// av beställningstiden.
+		/// </summary>
+		/// <returns></returns>
 		public async Task ReceiveLastCall()
 		{
 			isLastOrders = true;
 			await CustomerLastOrders();
 		}
 
+		/// <summary>
+		/// ReceiveStopServing tar emot slutet av beställningstiden.
+		/// </summary>
+		/// <returns></returns>
 		public async Task ReceiveStopServing()
 		{
 			isClosed = true;
@@ -128,19 +184,19 @@ namespace TestTeaShop
 				await SendGoodbye();
 		}
 
+		/// <summary>
+		/// SendGoodbye körs när kunden lämnar affären och säger hej då. Kunden rapportera om
+		/// den fick alla önskade koppar eller inte.
+		/// </summary>
+		/// <returns></returns>
 		private async Task SendGoodbye()
 		{
-			//owner.lastCall -= ReceiveLastCall;
-			//owner.stopServing -= ReceiveStopServing;
-
 			if(numTeaCups > 0)
 				Console.WriteLine("\nCustomer " + id + " waves goodbye but still wanted " + numTeaCups + " cups.\n");
 			else
 				Console.WriteLine("\nCustomer " + id + " waves goodbye.\n");
 
 			await owner.ReceiveGoodbye(this);
-
-			//goodbye(this, new GoodbyeEventArgs(this));
 		}
 	}
 }

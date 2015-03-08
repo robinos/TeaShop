@@ -8,13 +8,20 @@ using System.Globalization;
 
 namespace TestTeaShop
 {
+	/// <summary>
+	/// Clock objektet hanterar tiden och klockslag för viktiga händelser som
+	/// början, lastcall, sluta servera, stängdags och slutet.
+	/// </summary>
 	public class Clock
 	{
+		//händelser för klockan
 		public EventHandler lastCall;
 		public EventHandler startServing;
 		public EventHandler stopServing;
 		public EventHandler closingTime;
+		//Klockan
 		private static Timer myClockTimer;
+		//Kulturinfo och DateTime variabler för tidspunkter
 		private static CultureInfo cultureInfo = new CultureInfo("sv-SE");
 		private static DateTime currentTime;
 		private static DateTime startTime;
@@ -26,13 +33,21 @@ namespace TestTeaShop
 		private bool pastLastCall = false;
 		private bool pastStopServing = false;
 		private bool pastClose = false;
+		//Owner objektet
 		private Owner owner;
 
+		/// <summary>
+		/// CurrentTime ger tiden just nu i simuleringen.
+		/// </summary>
 		public DateTime CurrentTime
 		{
 			get { return currentTime; }
 		}
 
+		/// <summary>
+		/// Clock tar emot en owner objekt och startar tidsberäkningen.
+		/// </summary>
+		/// <param name="owner"></param>
 		public Clock(Owner owner)
 		{
 			DateTime.TryParse("14:55:00", cultureInfo, DateTimeStyles.None, out currentTime);
@@ -41,17 +56,32 @@ namespace TestTeaShop
 			DateTime.TryParse("15:45:00", cultureInfo, DateTimeStyles.None, out stopServingTime);
 			DateTime.TryParse("16:00:00", cultureInfo, DateTimeStyles.None, out endTime);
 			myClockTimer = new Timer(1000); //1 seconds
+
+			//OnTimedEvent blir observer till myClockTimer.Elapsed (efter varje tick av klockan)
 			myClockTimer.Elapsed += OnTimedEvent;
+	
+			//Startar klockan
 			myClockTimer.Enabled = true;
 			Console.WriteLine("\nCurrent time: " + ReportTime() + "\n");
 			this.owner = owner;
 		}
 
+		/// <summary>
+		/// En hjälp metoder för att reportera tiden till consolen.
+		/// </summary>
+		/// <returns>En sträng med tidsinformation</returns>
 		public string ReportTime()
 		{
 			return(currentTime.ToString(timeFormat));
 		}
 
+		/// <summary>
+		/// OnTimedEvent körs varje tick (sekund) och skickar ut metodanrop när
+		/// viktiga händelser händer sker för klockan som 'endTime', 'stopServingTime',
+		/// 'lastCallTime', och 'startTime'
+		/// </summary>
+		/// <param name="source"></param>
+		/// <param name="e"></param>
 		private void OnTimedEvent(Object source, ElapsedEventArgs e)
 		{
 			Clock.currentTime = currentTime.AddMinutes(1);
@@ -83,35 +113,59 @@ namespace TestTeaShop
 			}
 		}
 
+		/// <summary>
+		/// SendStartServing signalera till Owner objektet att nu ska den börjar
+		/// ta emot beställningar genom att anropa RecieveAndStartServing.
+		/// </summary>
+		/// <returns>Task (tom)</returns>
 		private async Task SendStartServing()
 		{
-			//startServing(this, new EventArgs());
 			await owner.ReceiveAndStartServing();
 		}
 
+		/// <summary>
+		/// SendLastCall signalera till Owner objektet att nu är det sista
+		/// beställningar (det är kunder som reagera på det). Det görs med
+		/// SendLastCall.
+		/// </summary>
+		/// <returns>Task (tom)</returns>
 		private async Task SendLastCall()
 		{
-			//lastCall(this, new EventArgs());
 			await owner.ReceiveAndSendLastCall();
 		}
 
+		/// <summary>
+		/// SendStopServing signalera till Owner objektet att nu ska den sluta
+		/// ta emot beställningar. Det görs med ReceiveAndStopServing.
+		/// </summary>
+		/// <returns>Task (tom)</returns>
 		private async Task SendStopServing()
 		{
-			//stopServing(this, new EventArgs());
 			await owner.ReceiveAndStopServing();
 		}
 
+		/// <summary>
+		/// SendClosingTime signalera till Owner objektet att nu är det stängdags.
+		/// Det görs med ReceiveClosingTime.
+		/// </summary>
+		/// <returns>Task (tom)</returns>
 		private async Task SendClosingTime()
 		{
-			//closingTime(this, new EventArgs());
 			await owner.ReceiveClosingTime();
 		}
 
+		/// <summary>
+		/// receivedShutDown är en hjälp metod för att stänga ner timer
+		/// tråden vid avstängning.
+		/// </summary>
 		public void receivedShutDown()
 		{
 			stopClock();
 		}
 
+		/// <summary>
+		/// stopClock stoppar timer tråden.
+		/// </summary>
 		private void stopClock()
 		{
 			myClockTimer.Stop();
